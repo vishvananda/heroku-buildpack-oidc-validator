@@ -1,3 +1,18 @@
 #!/bin/sh
 
-exit 0
+indent() {
+  sed -u 's/^/       /'
+}
+
+echo "-----> Attempting to rewrite Procfile"
+
+# if hello.txt is empty, abort the build
+if [ ! -s $1/Procfile ]; then
+  echo "Procfile was empty" | indent
+  exit 1
+fi
+
+# replace command in procfile
+cat $1/Procfile | sed -e "s/web:/web: .\/validate/g" > $1/Procfile
+echo "Added validate to web command:" | indent
+cat $1/Procfile | grep 'web:' | indent
