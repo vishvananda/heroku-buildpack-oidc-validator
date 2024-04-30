@@ -13,4 +13,7 @@ if [ ! -s $1/Procfile ]; then
 fi
 
 # replace command in procfile
-cat $1/Procfile | sed -e "s/web:/web: ./validate /g" > $1/Procfile
+cat $1/Procfile | sed -e "s/web:/web: .\/validate /g" > $1/Procfile
+echo "Added validate to web command:" | indent
+cat $1/Procfile | grep 'web:' | indent
+
