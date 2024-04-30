@@ -1,4 +1,11 @@
 #!/bin/sh
+#
+#### Configure directories
+
+BUILD_DIR=${1:-}
+CACHE_DIR=${2:-}
+ENV_DIR=${3:-}
+BP_DIR=$(cd "$(dirname "${0:-}")"; cd ..; pwd)
 
 indent() {
   sed -u 's/^/       /'
@@ -6,13 +13,18 @@ indent() {
 
 echo "-----> Attempting to rewrite Procfile"
 
-# if hello.txt is empty, abort the build
+# if Procfile is empty, abort the build
 if [ ! -s $1/Procfile ]; then
   echo "Procfile was empty" | indent
   exit 1
 fi
 
+# copy proxy into bin directory
+mkdir -p $BUILD_DIR/bin
+cp $BP_DIR/validate-proxy $BUILD_DIR/bin
+echo "Copied validate-proxy into ./bin/" | indent
 # replace command in procfile
 sed -i "s/web:/web: .\/bin\/validate-proxy/g" $1/Procfile
 echo "Added validate proxy to web command:" | indent
 cat $1/Procfile | grep 'web:' | indent
+
