@@ -1,11 +1,16 @@
 #!/bin/sh
 
-cat << EOF
----
-addons:
-  - shared-database:5mb
-config_vars:
-  PATH: bin:/usr/bin:/bin
-default_process_types:
-  hello: cat hello.txt
-EOF
+indent() {
+  sed -u 's/^/       /'
+}
+
+echo "-----> Attempting to rewrite Procfile"
+
+# if hello.txt is empty, abort the build
+if [ ! -s $1/Procfile ]; then
+  echo "Procfile was empty" | indent
+  exit 1
+fi
+
+# replace command in procfile
+cat $1/Procfile | sed -e "s/web:/web: ./validate /g" > $1/Procfile
