@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net/url"
 	"net/http"
@@ -57,7 +56,7 @@ func getIssuer(p string) (string, error) {
 }
 
 
-func getAppId (ctx context.Context, auth string, config extractConfig) (string) {
+func getSub (ctx context.Context, auth string, conn connection) (string) {
 	parts := strings.Fields(auth)
 	log.Info("Start")
 	if len(parts) != 2 {
@@ -72,16 +71,15 @@ func getAppId (ctx context.Context, auth string, config extractConfig) (string) 
 	issuer, err := getIssuer(rawToken)
 
 
-	// TODO: switch to regex
-	if !config.issuer.MatchString(issuer) {
-		log.Errorf("invalid issuer: %v", issuer)
+	if !conn.iss.MatchString(issuer) {
+		log.Debugf("unmatched issuer: %v %v", issuer, conn)
 		return ""
 	}
 
-	// TODO: cache provider locally
+	// TODO: cache providers
 	provider, err := oidc.NewProvider(ctx, issuer)
 	if err != nil {
-		log.Errorf("Failed to create provider: %v", err)
+		log.Debugf("Failed to create provider: %v", err)
 		return ""
 	}
 
@@ -95,62 +93,71 @@ func getAppId (ctx context.Context, auth string, config extractConfig) (string) 
 
 	match := false
 	for _, aud := range token.Audience {
-		if config.audience.MatchString(aud) {
+		if conn.aud.MatchString(aud) {
 			match = true
 			break
 		}
 	}
 	if !match {
-		log.Errorf("invalid audience: %v", token.Audience)
+		log.Debugf("unmatched audience: %v %v", token.Audience, conn)
 		return ""
 	}
 
-	results := config.subject.FindStringSubmatch(token.Subject)
-	if results == nil || len(results) != 2 {
-		log.Errorf("invalid subject: %v", token.Subject)
+	results := conn.sub.FindStringSubmatch(token.Subject)
+	if results == nil {
+		log.Debugf("unmatched subject: %v %v", token.Subject, conn)
 		return ""
 	}
-	return results[1]
+	if len(results) > 1 {
+		return results[1]
+	} else {
+		return token.Subject
+	}
 }
 
-type extractConfig struct {
-	issuer *regexp.Regexp
-	audience *regexp.Regexp
-	subject *regexp.Regexp
+type connection struct {
+	id string
+	iss *regexp.Regexp
+	aud *regexp.Regexp
+	sub *regexp.Regexp
 }
 
-func getRegexConfig() (extractConfig, error) {
-	config := extractConfig{}
+func getConnection(name, id string) (connection, error) {
+	// default value will allow any heroku identities to connect
+	base := "CONN_" + name
+	conn := connection{id: id}
 	var err error
-	issuer := "^https://oidc.heroku.com"
-	if v, ok := os.LookupEnv("VALIDATOR_ISSUER_REGEX"); ok {
-		issuer = v
+	iss := "^https://oidc.heroku.com"
+	if v, ok := os.LookupEnv(base+"_ISS"); ok {
+		iss = v
 	}
-	config.issuer, err = regexp.Compile(issuer)
+	conn.iss, err = regexp.Compile(iss)
 	if err != nil {
-		return config, err
+		return conn, err
 	}
-	audience := "^heroku$" // should probably be configured from HEROKU_APP_UUID
-	if v, ok := os.LookupEnv("VALIDATOR_AUDIENCE_REGEX"); ok {
-		audience = v
+	aud := "^heroku$" // should probably be connured from HEROKU_APP_UUID
+	if v, ok := os.LookupEnv(base+"_AUD"); ok {
+		aud = v
 	}
-	config.audience, err = regexp.Compile(audience)
+	conn.aud, err = regexp.Compile(aud)
 	if err != nil {
-		return config, err
+		return conn, err
 	}
-	subject := "^app:([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\\.[a-z0-9\\-]+::(?:dyno|run):[a-z0-9\\.]*$"
-	if v, ok := os.LookupEnv("VALIDATOR_SUBJECT_REGEX"); ok {
-		subject = v
+	sub := "^app:([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\\.[a-z0-9\\-]+::(?:dyno|run):[a-z0-9\\.]*$"
+	if v, ok := os.LookupEnv(base+"_SUB"); ok {
+		sub = v
 	}
-	config.subject, err = regexp.Compile(subject)
+	conn.sub, err = regexp.Compile(sub)
 	if err != nil {
-		return config, err
+		return conn, err
 	}
-	if config.subject.NumSubexp() < 1 {
-		return config, errors.New("Must specify a match group for subject")
-	}
-	return config, nil
+	os.Unsetenv(base+"_ID")
+	os.Unsetenv(base+"_ISS")
+	os.Unsetenv(base+"_AUD")
+	os.Unsetenv(base+"_SUB")
+	return conn, nil
 }
+
 
 func runValidate(args []string) error {
 	port := "8000"
@@ -158,15 +165,34 @@ func runValidate(args []string) error {
 		port = p
 	}
 
-	headerName := "X-Heroku-App-Id"
-	if v, ok := os.LookupEnv("VALIDATOR_HEADER_NAME"); ok {
-		headerName = v
+	subHeader := "X-Heroku-Conn-Sub"
+	if v, ok := os.LookupEnv("VALIDATOR_SUB_HEADER"); ok {
+		subHeader = v
 	}
 
-	config, err := getRegexConfig()
+	idHeader := "X-Heroku-Conn-Id"
+	if v, ok := os.LookupEnv("VALIDATOR_ID_HEADER"); ok {
+		idHeader = v
+	}
+
+	idRe, err := regexp.Compile("^CONN_([A-Z0-9_]+)_ID=")
 	if err != nil {
 		log.Error(err)
 		return err
+	}
+
+	conns := []connection{}
+	for _, item := range os.Environ() {
+		results := idRe.FindStringSubmatch(item)
+		if results != nil {
+			id := strings.SplitN(item, "=", 2)
+			conn, err := getConnection(results[1], id[1])
+			if err != nil {
+				log.Error(err)
+				return err
+			}
+			conns = append(conns, conn)
+		}
 	}
 
 
@@ -207,11 +233,15 @@ func runValidate(args []string) error {
 					log.Println(r.URL)
 					r.Host = remote.Host
 					auth := r.Header.Get("Authorization")
-					appId := getAppId(r.Context(), auth, config)
-					if appId == "" {
-						r.Header.Del(headerName)
-					} else {
-						r.Header.Set(headerName, appId)
+					r.Header.Del(idHeader)
+					r.Header.Del(subHeader)
+					for _, conn := range conns {
+						sub := getSub(r.Context(), auth, conn)
+						if sub != "" {
+							r.Header.Set(idHeader, conn.id)
+							r.Header.Set(subHeader, sub)
+							break
+						}
 					}
 					p.ServeHTTP(w, r)
 			}

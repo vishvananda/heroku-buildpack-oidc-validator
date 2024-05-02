@@ -33,14 +33,24 @@ Customizing the validation
 To customize how the validation works, you can set the following env vars on
 the app:
 
-- `VALIDATOR_HEADER_NAME`: this is the key used for the header that will
+- `VALIDATOR_REJECT_UNMATCHED`: if true, this will reject any request that
+  fails validation with a 401
+- `VALIDATOR_SUB_HEADER`: this is the key used for the header that will
     contain the validated subject name.
-- `VALIDATOR_ISSUER_REGEX`: this regex is used to validate the issuer or the
+- `VALIDATOR_ID_HEADER`: this is the key used for the header representing the
+  connection id.
+
+The validator looks for environment variables in the following format for valid
+connections. These env variables will be removed from the environment of the
+child app.
+- `CONN_.*_ID`: this is used as the value of `VALIDATOR_ID_HEADER`
+  token. For each matching id value, the values below are interpreted
+- `CONN_.*_ISS`: this regex is used to validate the issuer or the
   token
-- `VALIDATOR_AUDIENCE_REGEX`: the token must contain at least one audience that
+- `CONN_.*_AUD`: the token must contain at least one audience that
   matches this regex
-- `VALIDATOR_SUBJECT_REGEX`: this is used to validate the subject of the regex.
-  The regex must contain exactly one match group. The value from this match
-  group is used as the value in the header.
+- `CONN_.*_SUB`: this is used to validate the subject of the regex.
+  The may contain one match group. The value from this match
+  group or the whole sub is used as the value for `VAL_SUBJECT_HEADER`.
 
 
