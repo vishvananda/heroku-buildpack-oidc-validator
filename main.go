@@ -164,6 +164,13 @@ func runValidate(args []string) error {
 		port = p
 	}
 
+	reject := false
+	if v, ok := os.LookupEnv("VALIDATOR_REJECT_UNMATCHED"); ok {
+		l := strings.ToLower(v)
+		if l == "1"  || l == "t" || l == "true" {
+			reject = true
+		}
+	}
 	subHeader := "X-Heroku-Conn-Sub"
 	if v, ok := os.LookupEnv("VALIDATOR_SUB_HEADER"); ok {
 		subHeader = v
@@ -234,15 +241,23 @@ func runValidate(args []string) error {
 					auth := r.Header.Get("Authorization")
 					r.Header.Del(idHeader)
 					r.Header.Del(subHeader)
+					matched := false;
 					for _, conn := range conns {
 						sub := getSub(r.Context(), auth, conn)
 						if sub != "" {
 							r.Header.Set(idHeader, conn.id)
 							r.Header.Set(subHeader, sub)
+							matched = true
 							break
 						}
 					}
-					p.ServeHTTP(w, r)
+					if matched || !reject {
+						p.ServeHTTP(w, r)
+					} else {
+						w.WriteHeader(http.StatusUnauthorized)
+						w.Header().Set("Content-Type", "text/plain")
+						w.Write([]byte("Unauthorized"))
+					}
 			}
 	}
 
