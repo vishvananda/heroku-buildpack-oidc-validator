@@ -128,7 +128,7 @@ func getConnection(name, id string) (connection, error) {
 	conn := connection{id: id}
 	var err error
 	iss := "^https://oidc.heroku.com"
-	if v, ok := os.LookupEnv(base+"_ISS"); ok {
+	if v, ok := os.LookupEnv(base+"_OIDC_ISS"); ok {
 		iss = v
 	}
 	conn.iss, err = regexp.Compile(iss)
@@ -136,7 +136,7 @@ func getConnection(name, id string) (connection, error) {
 		return conn, err
 	}
 	aud := "^heroku$" // should probably be connured from HEROKU_APP_UUID
-	if v, ok := os.LookupEnv(base+"_AUD"); ok {
+	if v, ok := os.LookupEnv(base+"_OIDC_AUD"); ok {
 		aud = v
 	}
 	conn.aud, err = regexp.Compile(aud)
@@ -144,17 +144,16 @@ func getConnection(name, id string) (connection, error) {
 		return conn, err
 	}
 	sub := "^app:([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\\.[a-z0-9\\-]+::(?:dyno|run):[a-z0-9\\.]*$"
-	if v, ok := os.LookupEnv(base+"_SUB"); ok {
+	if v, ok := os.LookupEnv(base+"_OIDC_SUB"); ok {
 		sub = v
 	}
 	conn.sub, err = regexp.Compile(sub)
 	if err != nil {
 		return conn, err
 	}
-	os.Unsetenv(base+"_ID")
-	os.Unsetenv(base+"_ISS")
-	os.Unsetenv(base+"_AUD")
-	os.Unsetenv(base+"_SUB")
+	os.Unsetenv(base+"_OIDC_ISS")
+	os.Unsetenv(base+"_OIDC_AUD")
+	os.Unsetenv(base+"_OIDC_SUB")
 	return conn, nil
 }
 
