@@ -24,7 +24,7 @@ mkdir -p $BUILD_DIR/bin
 cp $BP_DIR/validate-proxy $BUILD_DIR/bin
 echo "Copied validate-proxy into ./bin/" | indent
 # replace command in procfile
-sed -i "s/web:/web: .\/bin\/validate-proxy/g" $1/Procfile
+sed -i "s/web\([^:]*\):/web\1: .\/bin\/validate-proxy/g" $1/Procfile
 echo "Added validate proxy to web command:" | indent
 cat $1/Procfile | grep 'web:' | indent
 
