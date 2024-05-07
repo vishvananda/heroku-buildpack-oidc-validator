@@ -171,12 +171,12 @@ func runValidate(args []string) error {
 			reject = true
 		}
 	}
-	subHeader := "X-Heroku-Conn-Sub"
+	subHeader := "X-Heroku-Source-Sub"
 	if v, ok := os.LookupEnv("VALIDATOR_SUB_HEADER"); ok {
 		subHeader = v
 	}
 
-	idHeader := "X-Heroku-Conn-Id"
+	idHeader := "X-Heroku-Source-Id"
 	if v, ok := os.LookupEnv("VALIDATOR_ID_HEADER"); ok {
 		idHeader = v
 	}
