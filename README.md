@@ -43,13 +43,13 @@ the app:
 The validator looks for environment variables in the following format for valid
 connections. These env variables will be removed from the environment of the
 child app.
-- `CONN_.*_ID`: this is used as the value of `VALIDATOR_ID_HEADER`
+- `SOURCE_.*_ID`: this is used as the value of `VALIDATOR_ID_HEADER`
   token. For each matching id value, the values below are interpreted
-- `CONN_.*_ISS`: this regex is used to validate the issuer or the
+- `SOURCE_.*_ISS`: this regex is used to validate the issuer or the
   token
-- `CONN_.*_AUD`: the token must contain at least one audience that
+- `SOURCE_.*_AUD`: the token must contain at least one audience that
   matches this regex
-- `CONN_.*_SUB`: this is used to validate the subject of the regex.
+- `SOURCE_.*_SUB`: this is used to validate the subject of the regex.
   The may contain one match group. The value from this match
   group or the whole sub is used as the value for `VAL_SUBJECT_HEADER`.
 

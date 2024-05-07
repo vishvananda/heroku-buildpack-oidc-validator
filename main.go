@@ -124,7 +124,7 @@ type connection struct {
 
 func getConnection(name, id string) (connection, error) {
 	// default value will allow any heroku identities to connect
-	base := "CONN_" + name
+	base := "SOURCE_" + name
 	conn := connection{id: id}
 	var err error
 	iss := "^https://oidc.heroku.com"
@@ -181,7 +181,7 @@ func runValidate(args []string) error {
 		idHeader = v
 	}
 
-	idRe, err := regexp.Compile("^CONN_([A-Z0-9_]+)_ID=")
+	idRe, err := regexp.Compile("^SOURCE_([A-Z0-9_]+)_ID=")
 	if err != nil {
 		log.Error(err)
 		return err
